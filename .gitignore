@@ -10,7 +10,7 @@
 *.token
 *-mipsle
 *-mips
-*.DS_Store
+.DS_Store
 
 # Test binary, built with `go test -c`
 *.test
