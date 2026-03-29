@@ -9,7 +9,7 @@ Bu depo, bir Debian sunucu üzerinde çalışan Docker/Dockge altyapısını ve 
 ## 🛠️ Nasıl Kullanılır?
 
 ### 1. Cloudflared Derleme (Keenetic İçin)
-`cloudflared-keenetic-builder` klasöründeki compose dosyasını Dockge veya Portainer üzerinden çalıştırın. MIPSLE mimarisi için derlenmiş ve preslenmiş dosya `derlenenler` klasörüne çıkacaktır.
+`cloudflared-keenetic-builder` klasöründeki compose dosyasını Dockge veya Portainer üzerinden çalıştırın. MIPSLE ve MIPS mimarisi için derlenmiş ve preslenmiş dosya `derlenenler` klasörüne çıkacaktır.
 
 ### 2. Keenetic'e Kurulum
 Çıkan dosyayı modemin `/opt/home/` dizinine atın. `S99cloudflared` betiğini `/opt/etc/init.d/` içine kopyalayıp `chmod +x` ile yetki verin.
