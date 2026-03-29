@@ -1,0 +1,23 @@
+services:
+  compiler:
+    image: golang:1.24
+    container_name: cloudflared_mips_compiler
+    volumes:
+      - ./derlenenler:/output
+    command: >
+      bash -c "
+      echo 'UPX Sıkıştırma aracı kuruluyor...' &&
+      apt-get update && apt-get install -y upx &&
+      echo 'Cloudflared en güncel kaynak kodu indiriliyor...' &&
+      git clone https://github.com/cloudflare/cloudflared.git /src &&
+      cd /src &&
+      echo 'Keenetic MIPSLE için derleniyor...' &&
+      GOOS=linux GOARCH=mipsle GOMIPS=softfloat go build -ldflags='-s -w' -o /output/cloudflared-mipsle ./cmd/cloudflared &&
+      echo 'UPX ile MIPSLE dosyası küçültülüyor...' &&
+      upx -9 /output/cloudflared-mipsle &&
+      echo 'Keenetic MIPS için derleniyor...' &&
+      GOOS=linux GOARCH=mips GOMIPS=softfloat go build -ldflags='-s -w' -o /output/cloudflared-mips ./cmd/cloudflared &&
+      echo 'UPX ile MIPS dosyası küçültülüyor...' &&
+      upx -9 /output/cloudflared-mips &&
+      echo 'Sıkıştırma ve Derleme Başarılı! Yeni dosyalar hazır.'
+      "

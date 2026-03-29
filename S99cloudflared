@@ -1,0 +1,106 @@
+TH=/opt/bin:/opt/sbin:/opt/home:/sbin:/bin:/usr/sbin:/usr/bin
+
+PIDFILE="/opt/var/run/cloudflared.pid"
+CLOUDFLARED="/opt/home/cloudflared"
+LOGFILE="/opt/var/log/cloudflared.log"
+TOKENFILE="/opt/etc/cloudflared.token"
+
+mkdir -p /opt/var/run /opt/var/log /opt/etc
+
+cloudflared_status() {
+  [ -f "$PIDFILE" ] || return 1
+  pid="$(cat "$PIDFILE" 2>/dev/null)"
+  case "$pid" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  kill -0 "$pid" 2>/dev/null
+}
+
+wait_for_time() {
+  # NTP oturmadan TLS sorun çıkartabiliyor. Maks 90 sn bekle.
+  i=0
+  while [ $i -lt 90 ]; do
+    y="$(date +%Y 2>/dev/null)"
+    case "$y" in
+      ''|*[!0-9]*) ;;
+      *)
+        [ "$y" -ge 2020 ] && return 0
+        ;;
+    esac
+    i=$((i+1))
+    sleep 1
+  done
+  return 0  # Zorlamayalım; bazı sistemlerde date formatı değişebilir
+}
+
+wait_for_wan() {
+  # Maks 60 sn
+  i=0
+  while [ $i -lt 60 ]; do
+    ping -c1 -W1 1.1.1.1 >/dev/null 2>&1 && return 0
+    i=$((i+1))
+    sleep 1
+  done
+  return 0
+}
+
+start() {
+  if cloudflared_status; then
+    echo "cloudflared already running (PID $(cat "$PIDFILE"))"
+    return 0
+  fi
+
+  [ -x "$CLOUDFLARED" ] || { echo "cloudflared binary yok/çalıştırılamıyor: $CLOUDFLARED"; return 1; }
+  [ -f "$TOKENFILE" ] || { echo "token dosyası yok: $TOKENFILE"; return 1; }
+
+  TOKEN="$(cat "$TOKENFILE" 2>/dev/null)"
+  [ -n "$TOKEN" ] || { echo "token boş görünüyor"; return 1; }
+
+  echo "Starting cloudflared..."
+  wait_for_time
+  wait_for_wan
+
+  "$CLOUDFLARED" --no-autoupdate --protocol http2 --pidfile="$PIDFILE" \
+    tunnel run --token "$TOKEN" >>"$LOGFILE" 2>&1 &
+
+# PID dosyası oluşsun diye (maks 10 sn) bekle
+j=0
+while [ $j -lt 10 ]; do
+    cloudflared_status && { echo "cloudflared started"; return 0; }
+    j=$((j+1))
+    sleep 1
+done
+echo "cloudflared failed (pidfile gelmedi), check $LOGFILE"
+return 1
+
+}
+
+stop() {
+  if cloudflared_status; then
+    echo "Stopping cloudflared..."
+    kill "$(cat "$PIDFILE")" 2>/dev/null
+    # Kibarca kapanması için kısa bekleme
+    sleep 2
+    cloudflared_status && kill -9 "$(cat "$PIDFILE")" 2>/dev/null
+    rm -f "$PIDFILE"
+  else
+    echo "cloudflared is not running"
+  fi
+}
+
+status() {
+  if cloudflared_status; then
+    echo "cloudflared is running (PID $(cat "$PIDFILE"))"
+  else
+    echo "cloudflared is not running"
+  fi
+}
+
+restart() { stop; sleep 2; start; }
+
+case "$1" in
+  start|stop|restart|status) "$1" ;;
+  *) echo "Usage: $0 {start|stop|restart|status}" ;;
+esac
+
+
