@@ -7,6 +7,10 @@
 *.dll
 *.so
 *.dylib
+*.token
+*-mipsle
+*-mips
+*.DS_Store
 
 # Test binary, built with `go test -c`
 *.test
