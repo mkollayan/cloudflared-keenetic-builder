@@ -1,6 +1,6 @@
 services:
   compiler:
-    image: golang:1.24
+    image: golang:1.26
     container_name: cloudflared_mips_compiler
     volumes:
       - ./derlenenler:/output
