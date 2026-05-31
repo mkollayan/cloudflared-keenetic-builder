@@ -1,23 +1,36 @@
 services:
   compiler:
-    image: golang:1.26
-    container_name: cloudflared_mips_compiler
+    image: golang:1.26-bookworm
     volumes:
       - ./derlenenler:/output
     command: >
       bash -c "
       echo 'UPX Sıkıştırma aracı kuruluyor...' &&
-      apt-get update && apt-get install -y upx &&
+      apt-get update &&
+      apt-get install -y --no-install-recommends git ca-certificates &&
+      (apt-get install -y --no-install-recommends upx ||
+        apt-get install -y --no-install-recommends upx-ucl ||
+        (echo 'deb http://deb.debian.org/debian bookworm-backports main' > /etc/apt/sources.list.d/bookworm-backports.list &&
+          apt-get update &&
+          apt-get install -y --no-install-recommends -t bookworm-backports upx-ucl)) &&
+      UPX_BIN=$(command -v upx || command -v upx-ucl) &&
+      test -n $$UPX_BIN &&
+      echo 'UPX binary:' $$UPX_BIN &&
       echo 'Cloudflared en güncel kaynak kodu indiriliyor...' &&
-      git clone https://github.com/cloudflare/cloudflared.git /src &&
+      rm -rf /src &&
+      git clone --depth 1 https://github.com/cloudflare/cloudflared.git /src &&
       cd /src &&
       echo 'Keenetic MIPSLE için derleniyor...' &&
-      GOOS=linux GOARCH=mipsle GOMIPS=softfloat go build -ldflags='-s -w' -o /output/cloudflared-mipsle ./cmd/cloudflared &&
+      CGO_ENABLED=0 GOOS=linux GOARCH=mipsle GOMIPS=softfloat go build -trimpath -ldflags='-s -w' -o /output/cloudflared-mipsle ./cmd/cloudflared &&
       echo 'UPX ile MIPSLE dosyası küçültülüyor...' &&
-      upx -9 /output/cloudflared-mipsle &&
+      $$UPX_BIN -9 /output/cloudflared-mipsle &&
       echo 'Keenetic MIPS için derleniyor...' &&
-      GOOS=linux GOARCH=mips GOMIPS=softfloat go build -ldflags='-s -w' -o /output/cloudflared-mips ./cmd/cloudflared &&
+      CGO_ENABLED=0 GOOS=linux GOARCH=mips GOMIPS=softfloat go build -trimpath -ldflags='-s -w' -o /output/cloudflared-mips ./cmd/cloudflared &&
       echo 'UPX ile MIPS dosyası küçültülüyor...' &&
-      upx -9 /output/cloudflared-mips &&
+      $$UPX_BIN -9 /output/cloudflared-mips &&
+      echo 'SHA256 Checksums:' &&
+      cd /output &&
+      sha256sum cloudflared-mipsle cloudflared-mips > SHA256SUMS &&
+      cat SHA256SUMS &&
       echo 'Sıkıştırma ve Derleme Başarılı! Yeni dosyalar hazır.'
       "
