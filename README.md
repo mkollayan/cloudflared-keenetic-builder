@@ -1,24 +1,108 @@
-# 🚀 Keenetic & Debian Home Server Setup
+# Keenetic Cloudflared MIPS Builder
 
-Bu depo, bir Debian sunucu üzerinde çalışan Docker/Dockge altyapısını ve Keenetic router'lar için özel olarak derlenmiş hafifletilmiş Cloudflared (MIPS/UPX) tünel kurulumunu içerir.
+Keenetic ve benzeri MIPS tabanlı router'larda Cloudflare Tunnel çalıştırmak için hazırlanmış küçük bir build ve kurulum deposu.
 
-## 🌟 Neler Var?
-1. **Cloudflared Çapraz Derleme Fabrikası:** MIPS mimarisine sahip router'lar (Keenetic vb.) için Go 1.26 ile en güncel Cloudflared sürümünü derler ve **UPX** ile 40MB'dan 8MB'a sıkıştırır.
-2. **Keenetic Init Betiği:** Cloudflared'in elektrik kesintilerinde (NTP saati ve WAN gelmeden önce) sorunsuz başlamasını sağlayan `S99cloudflared` betiği.
+Bu proje, upstream `cloudflare/cloudflared` kaynak kodunu Docker içinde derler, MIPS/MIPSLE binary üretir, UPX ile küçültür, SHA256 checksum oluşturur ve Keenetic/Entware ortamında boot sonrası otomatik başlatma için `S99cloudflared` init betiği sağlar.
 
-## 🛠️ Nasıl Kullanılır?
+## Neden Var?
 
-### 1. Cloudflared Derleme (Keenetic İçin)
-`cloudflared-keenetic-builder` klasöründeki compose dosyasını Dockge veya Portainer üzerinden çalıştırın. MIPSLE ve MIPS mimarisi için derlenmiş ve preslenmiş dosya `derlenenler` klasörüne çıkacaktır.
+Cloudflare Tunnel self-hosting ve Zero Trust erişimi için yaygın kullanılıyor, ancak düşük güçlü MIPS router'larda resmi kurulum yolu her zaman pratik değil. Bu depo özellikle şu ihtiyacı çözer:
 
-Derleme sonunda `derlenenler/SHA256SUMS` dosyası oluşturulur ve MIPS/MIPSLE dosyalarının SHA256 doğrulama çıktıları terminale yazdırılır.
+- Keenetic router üzerinde ayrı bir sunucuya gerek kalmadan `cloudflared` çalıştırma
+- Tekrarlanabilir Docker tabanlı MIPS/MIPSLE build akışı
+- Router depolaması için UPX ile küçültülmüş binary
+- Üretilen dosyalar için `SHA256SUMS` doğrulama dosyası
+- WAN ve NTP gecikmelerine dayanacak init script
 
-Compose akışı Dockge üzerinde birden fazla stack ile çakışmaması için sabit container adı kullanmaz. UPX paketi Debian Bookworm ana deposunda bulunamazsa otomatik olarak `upx-ucl` ve `bookworm-backports` üzerinden kurulum denenir.
+## Test Edilen Cihaz
 
-### 2. Keenetic'e Kurulum
-Çıkan dosyayı modemin `/opt/home/` dizinine atın. `S99cloudflared` betiğini `/opt/etc/init.d/` içine kopyalayıp `chmod +x` ile yetki verin.
+- Keenetic Hopper DSL (KN-3610) TR
+- `uname -a` mimarisi: `mips GNU/Linux`
+- Test edilen çalışan binary: `cloudflared-mips`
 
-Keenetic Hopper DSL (KN-3610) üzerinde test edilen çalışan dosya `cloudflared-mips` dosyasıdır.
+`cloudflared-mipsle` de üretilir; farklı Keenetic/router modelleri için gerekebilir.
 
-## ⚠️ Uyarı
-Compose dosyalarındaki şifreleri, alan adlarını ve token kısımlarını kendi sisteminize göre değiştirmeyi unutmayın!
+## Dosyalar
+
+- `compose.yaml`: Cloudflared MIPS/MIPSLE build akışı
+- `S99cloudflared`: Keenetic/Entware init script
+- `cloudflared.token.example`: Token dosyası örneği
+- `cloudflared`: Örnek/önceki test binary dosyası
+
+## Build
+
+Dockge, Portainer veya Docker Compose ile çalıştırın:
+
+```sh
+docker compose run --rm compiler
+```
+
+Build sonunda `derlenenler/` dizininde şu dosyalar oluşur:
+
+```text
+cloudflared-mips
+cloudflared-mipsle
+SHA256SUMS
+```
+
+Compose akışı:
+
+- `golang:1.26-bookworm` imajı kullanır
+- `git` ve `ca-certificates` paketlerini kurar
+- UPX için önce `upx`, sonra `upx-ucl`, gerekirse `bookworm-backports` dener
+- `cloudflare/cloudflared` deposunu `--depth 1` ile indirir
+- `CGO_ENABLED=0` ve `-trimpath` ile cross-compile yapar
+- UPX sonrası SHA256 checksum oluşturur
+
+## Keenetic Kurulum
+
+KN-3610 için `cloudflared-mips` dosyasını modemde script'in beklediği isme koyun:
+
+```sh
+cp /opt/home/cloudflared-mips /opt/home/cloudflared
+chmod +x /opt/home/cloudflared
+```
+
+Token dosyasını hazırlayın. `cloudflared.token.example` dosyasını örnek alıp gerçek token'i modem üzerinde `/opt/etc/cloudflared.token` dosyasına yazın:
+
+```sh
+vi /opt/etc/cloudflared.token
+chmod 600 /opt/etc/cloudflared.token
+```
+
+Init script'i yerleştirin ve çalıştırılabilir yapın:
+
+```sh
+cp S99cloudflared /opt/etc/init.d/S99cloudflared
+chmod +x /opt/etc/init.d/S99cloudflared
+```
+
+Servisi başlatın ve kontrol edin:
+
+```sh
+/opt/etc/init.d/S99cloudflared start
+/opt/etc/init.d/S99cloudflared status
+tail -n 50 /opt/var/log/cloudflared.log
+```
+
+## Güvenlik Notları
+
+- Gerçek Cloudflare tunnel token'ini repoya commit etmeyin.
+- `cloudflared.token` dosyasını modem üzerinde mümkünse `chmod 600` ile saklayın.
+- Üretilen binary'leri modem üzerine atmadan önce `SHA256SUMS` ile doğrulayın.
+- Bu proje Cloudflare veya Keenetic tarafından resmi olarak sağlanan bir paket değildir.
+
+## Bakım Notları
+
+`S99cloudflared` betiği:
+
+- PATH'i Entware/Keenetic ortamlarına göre ayarlar
+- NTP zamanı oturmadan TLS hatası almamak için bekler
+- WAN bağlantısını ping ile kontrol eder
+- Stale PID dosyasını temizler
+- Token dosyasındaki Windows satır sonlarını temizler
+- Logları `/opt/var/log/cloudflared.log` dosyasına yazar
+
+## Lisans
+
+Bu depo MIT lisansı ile yayınlanır. Cloudflared kendi upstream lisansı ve koşulları ile Cloudflare tarafından geliştirilmektedir.
