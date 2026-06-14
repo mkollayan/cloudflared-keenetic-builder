@@ -8,6 +8,7 @@
 *.so
 *.dylib
 *.token
+derlenenler/
 *-mipsle
 *-mips
 .DS_Store

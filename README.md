@@ -90,6 +90,8 @@ tail -n 50 /opt/var/log/cloudflared.log
 
 Keenetic SSH servisi doğrudan Linux shell yerine `(config)>` CLI açtığı için klasik `scp` her cihazda çalışmayabilir. Bu nedenle deploy script'i dosyayı `ssh` üzerinden `exec sh` ile aktarır.
 
+Bu yöntem Keenetic Hopper DSL (KN-3610) üzerinde test edilmiştir.
+
 Varsayılan kullanım:
 
 ```sh
@@ -113,6 +115,38 @@ Script'in yaptığı işlem:
 - Eski binary'yi `/opt/home/cloudflared.bak` olarak yedekler
 - Yeni binary'yi `/opt/home/cloudflared` olarak taşır
 - Servisi tekrar başlatır ve status çıktısını gösterir
+
+## Sorun Giderme
+
+### `scp: subsystem request failed`
+
+Keenetic SSH servisi SFTP subsystem sağlamadığı için modern `scp` dosya gönderimi başarısız olabilir. `scripts/deploy-keenetic.sh` kullanın; script dosyayı `scp` yerine `ssh + exec sh + cat` ile aktarır.
+
+### `no such command: scp`
+
+`scp -O` kullanıldığında uzak tarafta `scp -t` çalıştırılmaya çalışılır. Keenetic SSH oturumu doğrudan Linux shell yerine `(config)>` CLI açtığı için bu komut Keenetic CLI tarafından bilinmeyen komut olarak reddedilir. Deploy script bu durumu da bypass eder.
+
+### `token boş görünüyor`
+
+`/opt/etc/cloudflared.token` dosyasının var olduğunu ve ilk satırında gerçek Cloudflare tunnel token'i bulunduğunu kontrol edin:
+
+```sh
+chmod 600 /opt/etc/cloudflared.token
+```
+
+### `cloudflared failed (pidfile gelmedi)`
+
+Log dosyasını kontrol edin:
+
+```sh
+tail -n 50 /opt/var/log/cloudflared.log
+```
+
+Yaygın nedenler: yanlış mimari binary, eksik çalıştırma izni, hatalı token, WAN/DNS erişimi veya Cloudflare tarafında geçersiz tunnel yapılandırması.
+
+### `illegal instruction` veya `not found`
+
+Yanlış mimari binary kullanılıyor olabilir. KN-3610 için test edilen dosya `cloudflared-mips` dosyasıdır. Farklı modellerde `cloudflared-mipsle` gerekebilir.
 
 ## Güvenlik Notları
 
