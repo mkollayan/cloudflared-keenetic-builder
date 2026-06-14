@@ -26,6 +26,7 @@ Cloudflare Tunnel self-hosting ve Zero Trust erişimi için yaygın kullanılıy
 
 - `compose.yaml`: Cloudflared MIPS/MIPSLE build akışı
 - `S99cloudflared`: Keenetic/Entware init script
+- `scripts/deploy-keenetic.sh`: Derlenen binary'yi Keenetic cihaza SSH üzerinden yükleme script'i
 - `cloudflared.token.example`: Token dosyası örneği
 - `cloudflared`: Örnek/önceki test binary dosyası
 
@@ -84,6 +85,34 @@ Servisi başlatın ve kontrol edin:
 /opt/etc/init.d/S99cloudflared status
 tail -n 50 /opt/var/log/cloudflared.log
 ```
+
+## Otomatik Deploy
+
+Keenetic SSH servisi doğrudan Linux shell yerine `(config)>` CLI açtığı için klasik `scp` her cihazda çalışmayabilir. Bu nedenle deploy script'i dosyayı `ssh` üzerinden `exec sh` ile aktarır.
+
+Varsayılan kullanım:
+
+```sh
+./scripts/deploy-keenetic.sh
+```
+
+Farklı host, kullanıcı veya binary için:
+
+```sh
+MODEM_HOST=192.168.1.1 \
+MODEM_USER=admin \
+BINARY=derlenenler/cloudflared-mips \
+./scripts/deploy-keenetic.sh
+```
+
+Script'in yaptığı işlem:
+
+- Binary'yi `/opt/home/cloudflared.new` olarak yükler
+- Yerel ve modem üzerindeki SHA256 değerlerini karşılaştırır
+- `S99cloudflared` servisini durdurur
+- Eski binary'yi `/opt/home/cloudflared.bak` olarak yedekler
+- Yeni binary'yi `/opt/home/cloudflared` olarak taşır
+- Servisi tekrar başlatır ve status çıktısını gösterir
 
 ## Güvenlik Notları
 
