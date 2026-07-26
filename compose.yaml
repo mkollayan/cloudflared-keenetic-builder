@@ -16,21 +16,26 @@ services:
       UPX_BIN=$(command -v upx || command -v upx-ucl) &&
       test -n $$UPX_BIN &&
       echo 'UPX binary:' $$UPX_BIN &&
-      echo 'Cloudflared en güncel kaynak kodu indiriliyor...' &&
+      echo 'Cloudflared en güncel sürüm etiketi tespit ediliyor...' &&
+      CF_TAG=$(git ls-remote --tags --refs --sort=-v:refname https://github.com/cloudflare/cloudflared.git '[0-9][0-9][0-9][0-9].*' | head -n1 | sed 's|.*refs/tags/||') &&
+      test -n $$CF_TAG &&
+      echo 'En güncel sürüm:' $$CF_TAG &&
+      echo 'Cloudflared kaynak kodu indiriliyor...' &&
       rm -rf /src &&
-      git clone --depth 1 https://github.com/cloudflare/cloudflared.git /src &&
+      git clone --depth 1 --branch $$CF_TAG https://github.com/cloudflare/cloudflared.git /src &&
       cd /src &&
+      BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) &&
       echo 'Keenetic MIPSLE için derleniyor...' &&
-      CGO_ENABLED=0 GOOS=linux GOARCH=mipsle GOMIPS=softfloat go build -trimpath -ldflags='-s -w' -o /output/cloudflared-mipsle ./cmd/cloudflared &&
+      CGO_ENABLED=0 GOOS=linux GOARCH=mipsle GOMIPS=softfloat go build -trimpath -ldflags='-s -w -X main.Version='$$CF_TAG' -X main.BuildTime='$$BUILD_TIME -o /output/cloudflared-mipsle ./cmd/cloudflared &&
       echo 'UPX ile MIPSLE dosyası küçültülüyor...' &&
       $$UPX_BIN -9 /output/cloudflared-mipsle &&
       echo 'Keenetic MIPS için derleniyor...' &&
-      CGO_ENABLED=0 GOOS=linux GOARCH=mips GOMIPS=softfloat go build -trimpath -ldflags='-s -w' -o /output/cloudflared-mips ./cmd/cloudflared &&
+      CGO_ENABLED=0 GOOS=linux GOARCH=mips GOMIPS=softfloat go build -trimpath -ldflags='-s -w -X main.Version='$$CF_TAG' -X main.BuildTime='$$BUILD_TIME -o /output/cloudflared-mips ./cmd/cloudflared &&
       echo 'UPX ile MIPS dosyası küçültülüyor...' &&
       $$UPX_BIN -9 /output/cloudflared-mips &&
       echo 'SHA256 Checksums:' &&
       cd /output &&
       sha256sum cloudflared-mipsle cloudflared-mips > SHA256SUMS &&
       cat SHA256SUMS &&
-      echo 'Sıkıştırma ve Derleme Başarılı! Yeni dosyalar hazır.'
+      echo 'Sıkıştırma ve Derleme Başarılı! Derlenen sürüm:' $$CF_TAG
       "

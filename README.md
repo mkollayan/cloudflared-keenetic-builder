@@ -51,8 +51,9 @@ Compose akışı:
 - `golang:1.26-bookworm` imajı kullanır
 - `git` ve `ca-certificates` paketlerini kurar
 - UPX için önce `upx`, sonra `upx-ucl`, gerekirse `bookworm-backports` dener
-- `cloudflare/cloudflared` deposunu `--depth 1` ile indirir
+- `cloudflare/cloudflared` deposunun en güncel sürüm etiketini (release tag) tespit edip o etiketi `--depth 1` ile indirir
 - `CGO_ENABLED=0` ve `-trimpath` ile cross-compile yapar
+- Sürüm bilgisini `-ldflags -X main.Version` ile binary'ye işler; böylece `cloudflared version` çıktısı `DEV` yerine gerçek sürümü (örn. `2026.7.3`) gösterir
 - UPX sonrası SHA256 checksum oluşturur
 
 ## Keenetic Kurulum
